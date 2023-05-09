@@ -1,3 +1,4 @@
+import numpy as np
 '''
 frIsequence = GetMusicFeatures(signal,fs)
 or
@@ -70,7 +71,7 @@ def GetMusicFeatures(signal, fs, winlength=0.03):
         # correlation coefficient, and intensity
         pprd, maxcorr = yin_pitch(window,minlag,maxlag)
         frIsequence[:,n] = [fs/pprd, maxcorr, np.linalg.norm(window/np.sqrt(len(window)))]
-        
+
     return frIsequence
 
 '''
@@ -80,7 +81,7 @@ The estimate is based on the autocorrelation function.
 def yin_pitch(signal,minlag=40,maxlag=200):
 
     N = len(signal)
-    
+
     dif = np.zeros(maxlag - minlag)
     for idx in range(minlag, maxlag):
         seg1 = signal[idx : ]
@@ -91,7 +92,7 @@ def yin_pitch(signal,minlag=40,maxlag=200):
 
     thresh = (max(dif) - min(dif)) * 0.1 + min(dif);
 
-    
+
     # Locate the first minimum of dif, which is the first maximum of the
     # correlation; the corresponding lag is the pitch period.
     pprd = None
@@ -118,5 +119,5 @@ def yin_pitch(signal,minlag=40,maxlag=200):
     seg2 = signal[: N - pprd]
 
     maxcorr = np.corrcoef(seg1,seg2)[0,1]
-    
+
     return (pprd, maxcorr)
