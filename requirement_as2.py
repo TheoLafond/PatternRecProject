@@ -16,9 +16,9 @@ def plot_general(features_1,features_2,features_3):
 
     #ploting intensity
     fig, (ax1, ax2,ax3) = plt.subplots(3)
-    ax1.semilogy(time_1,features_1[2,:])
-    ax2.semilogy(time_2,features_2[2,:])
-    ax3.semilogy(time_3,features_3[2,:])
+    ax1.plot(time_1,features_1[2,:])
+    ax2.plot(time_2,features_2[2,:])
+    ax3.plot(time_3,features_3[2,:])
     ax1.set(xlim=[0,7.5],xlabel="time (s)",ylabel="Intensity", title="Melody 1")
     ax2.set(xlim=[0,7.5],xlabel="time (s)",ylabel="Intensity", title="Melody 2")
     ax3.set(xlim=[0,7.5],xlabel="time (s)",ylabel="Intensity", title="Melody 3")

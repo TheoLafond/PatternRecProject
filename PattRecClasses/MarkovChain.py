@@ -125,8 +125,25 @@ class MarkovChain:
     def initErgodic(self):
         pass
 
-    def forward(self):
-        pass
+    def forward(self,pX):
+        alphaHat = np.zeros(pX.shape)
+        if self.is_finite:
+            c = np.zeros(pX.shape[1]+1)
+            A_adapted = self.A[:,0:-1].transpose()
+        else:
+            c = np.zeros(pX.shape[1])
+            A_adapted = self.A.transpose()
+        atemp = self.q*pX[:,0]
+        c[0] = atemp.sum()
+        alphaHat[:,0] = atemp/c[0]
+        for t in range(1,pX.shape[1]):
+            
+            atemp = pX[:,t]*(A_adapted@alphaHat[:,t-1])
+            c[t] = atemp.sum()
+            alphaHat[:,t] = atemp/c[t]
+        if self.is_finite:
+            c[-1] = alphaHat[:,-1].transpose() @ self.A[:,-1]
+        return alphaHat, c
 
     def finiteDuration(self):
         pass
