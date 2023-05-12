@@ -51,7 +51,7 @@ class GaussD:
         R = R + np.matlib.repmat(self.means.reshape(-1, 1), 1, nData)
 
         return R
-    def evaluate(self,x):
+    def prob(self,x):
         if self.cov is None:
             return -1
         return np.exp(-np.power(x - self.means[0], 2.) / (2 * np.power(self.stdevs[0], 2.)))/(self.stdevs[0]*np.sqrt(2*np.pi))
