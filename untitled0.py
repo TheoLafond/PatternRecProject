@@ -15,6 +15,9 @@ hmm =HMM(leQ,[b1,b2])
 x = np.array([-0.2,2.6,1.3])
 
 pX,scaled = hmm.prob(x)
-print(leQ.forward(scaled))
+alphaHat, c = leQ.forward(scaled)
+
+betaHat = leQ.backward(scaled,c)
+print(betaHat)
 
 print(hmm.logprob(x))

@@ -148,8 +148,20 @@ class MarkovChain:
     def finiteDuration(self):
         pass
     
-    def backward(self):
-        pass
+    def backward(self,pX,c):
+        betaHat = np.zeros(pX.shape)
+        if self.is_finite:
+            cprod = c[-1]*c[-2]
+            betaHat[:,-1] = self.A[:,-1]/(cprod)
+            A_adapted = self.A[:,0:-1]
+        else:
+            cprod = c[-1]
+            betaHat[:,-1] = 1/cprod
+            A_adapted = self.A
+        
+        for t in range(pX.shape[1]-2,-1,-1):
+            betaHat[:,t]=(A_adapted@(pX[:,t+1]*betaHat[:,t+1]))/c[t]
+        return betaHat
 
     def adaptStart(self):
         pass
