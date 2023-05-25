@@ -50,6 +50,8 @@ class HMM:
 
         self.nStates = mc.nStates
         self.dataSize = distributions[0].dataSize
+        self.obs = []
+        self.name = "name"
     
     def rand(self, nSamples):
         """
@@ -92,12 +94,14 @@ class HMM:
         for i in range(self.nStates):
             pX[i,:] = self.outputDistr[i].prob(x)
         return pX, pX/pX.max(axis=0)
+    
     def logprob(self,x):
         p, scaled = self.prob(x)
         alphaHat,c=self.stateGen.forward(p)
         log_c = np.log(c)
         prob_seq = log_c.sum()
         return prob_seq
+    
     def adaptStart(self):
         pass
 
@@ -106,3 +110,137 @@ class HMM:
 
     def adaptAccum(self):
         pass
+    
+    
+    #page 113
+    def calcgammas(self, alphahats, betahats, cs, obs, uselog=False):
+            gammas = []
+            for i in range(len(obs)):
+                temp = []
+                for t in range(obs[i].shape[0]):
+                    if uselog:
+                        temp += [np.log(alphahats[i][t])+np.log(betahats[i][t])+np.log(cs[i][t])]
+                    else:
+                        temp += [alphahats[i][t]*betahats[i][t]*cs[i][t]]
+                gammas += [np.array(temp)]
+            gammas = np.array(gammas)
+            return gammas
+    
+    #page 130
+    def calcinit(self, gammas, uselog=False):
+        if uselog:
+            return np.sum(np.exp(gammas[:,0]), axis = 0)/np.sum(np.exp(gammas[:,0]))
+        else: 
+            return np.sum(gammas[:,0], axis = 0)/np.sum(gammas[:,0])
+    
+    def calcabc(self, obs):
+        alphahats = []
+        betahats = []
+        cs = []
+        for i in range(len(obs)):
+            pX,scaled = self.prob(obs[i])
+            alph, c = self.stateGen.forward(scaled)
+            beth = self.stateGen.backward(scaled,c) 
+            alphahats += [alph]
+            betahats += [beth]
+            cs += [c]
+        return alphahats, betahats, cs
+    
+    #page 132
+    def calcxi(self, alphahats, betahats, cs, obs, uselog=False):
+        A = self.stateGen
+        B = self.outputDistr
+        xirbars = []
+        xirs = []
+        for i in range(len(obs)): 
+            if self.mc.is_finite:
+                xi = np.zeros((obs[i].shape[0], A.shape[0], A.shape[1]))
+            else:
+                xi = np.zeros((obs[i].shape[0]-1, A.shape[0], A.shape[1]))
+            p, scaled = self.prob(obs[i])
+            if uselog: 
+                xi = np.log(xi)
+                p, scaled = logprob(obs[i])
+            for t in range(obs[i].shape[0]-1):
+                for j in range(A.shape[0]):
+                    for k in range(A.shape[0]):
+                        if uselog:
+                            xi[t, j, k] = np.log(alphahats[i][t][j])+np.log(A[j,k])+scaled[t+1][k]+np.log(betahats[i][t+1][k])
+                        else:
+                            xi[t, j, k] = alphahats[i][t][j]*A[j,k]*scaled[t+1][k]*betahats[i][t+1][k]
+            if self.finite:
+                for j in range(A.shape[0]):
+                    if uselog:
+                        xi[-1][j][-1] = np.log(alphahats[i][-1][j])+np.log(betahats[i][-1][j])+np.log(cs[i][-1])
+                    else:
+                        xi[-1][j][-1] = alphahats[i][-1][j]*betahats[i][-1][j]*cs[i][-1]
+                
+            if uselog:
+                xi = np.exp(xi)
+            xirs += [xi]
+            xirbars += [np.sum(xi, axis = 0)]
+            
+        xibar = np.sum(xirbars, axis = 0)
+        return xibar
+    
+    def printoutput(self, newmean, newcov):
+        print("Estimated a:")
+        # print(self.pi)
+        print()
+        print("Estimated A:")
+        print(self.A)
+        print()
+        print("Estimated means:")
+        print(newmean)
+        print()
+        print("Estimated covariances:")
+        print(newcov)        
+        
+    
+    '''
+    Baum-Welch Algorithm for learning HMM parameters from observations
+    '''
+    def baum_welch(self, obs, niter, uselog=False, scaled = True):     
+        A = self.stateGen.A
+        B = self.outputDistr
+        
+        for it in range(niter):
+            alphahats, betahats, cs = self.calcabc(obs) #from Assignment 3 and 4
+            gammas = self.calcgammas(alphahats, betahats, cs, obs, uselog) #alpha*beta*c
+            # newpi = self.calcinit(gammas, uselog) #average of gammas[:,0]
+            xibar = self.calcxi(alphahats, betahats, cs, obs, uselog) #page 132
+            if uselog: 
+                xibar = np.exp(xibar)
+                
+            newA = np.array([i/np.sum(i) for i in xibar]) #xibar/sum_k(xibar); page 130
+            
+            if uselog: 
+                gammas = np.exp(gammas)
+
+            summ = np.zeros((len(B), obs[0].shape[1]))
+            sumc = np.zeros((len(B), obs[0].shape[1], obs[0].shape[1]))
+            sumg = np.zeros((len(B)))
+
+            for i in range(len(obs)):
+                for t in range(obs[i].shape[0]): 
+                    for j in range(len(B)):
+                        summ[j] += obs[i][t]*gammas[i][t][j]
+                        sumg[j] += gammas[i][t][j]
+                        temp = obs[i][t] - np.atleast_2d(B[j].means)
+                        sumc[j] += gammas[i][t][j]*(temp.T.dot(temp))
+                        
+            newmean = np.zeros(summ.shape)
+            newcov = np.zeros(sumc.shape)
+            for i in range(newmean.shape[0]):
+                if sumg[i] > 0:
+                    newmean[i] = summ[i]/sumg[i]
+                    newcov[i] = sumc[i]/sumg[i]
+                else:
+                    newmean[i] = 0
+                    newcov[i]  = 0
+            
+            #update all variables
+            # self.pi = newpi
+            self.stateGen = newA
+            newB = [GaussD(newmean[i],stdevs=np.ones(newcov[i].shape[0]), cov=newcov[i]) for i in range(B.shape[0])]
+            self.outputDistr = newB
